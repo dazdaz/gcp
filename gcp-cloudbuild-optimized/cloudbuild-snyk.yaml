@@ -1,0 +1,16 @@
+curl -s https://get.snyk.io/cli/install-cli.sh | sh
+snyk init
+snyk add
+gcloud builds triggers create snyk-scan \
+--description "Snyk scan trigger" \
+--repo-name YOUR_REPO_NAME \
+--branch-name YOUR_BRANCH_NAME \
+--build-config cloudbuild.yaml
+
+steps:
+  - name: snyk/snyk-cli
+    entrypoint: snyk
+    args: ["test", "--json-file=snyk-results.json"]
+
+# Deploy code to GKE using
+gcloud builds submit --trigger snyk-scan

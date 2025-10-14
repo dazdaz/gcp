@@ -1,0 +1,55 @@
+steps:
+  #    - name: 'gcr.io/kaniko-project/executor:latest'
+  #      args: [
+  #      "--destination=${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/numbers-image:${BUILD_ID}",
+  #      "--destination=${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/java-image:${BUILD_ID}",
+  #      "--cache=true",
+  #      "--cache-ttl=8h"
+  #      ]
+
+### Compile GoLang App and containerize, through Dockerfile and Tag container
+    - id: 'build_go'
+      name: 'gcr.io/cloud-builders/docker'
+      dir: 'Gobuild'
+      args: ['build', '-t',
+             '${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/numbers-image:latest', '.',
+             '--cache-from', '${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/numbers-image:latest']
+      waitFor: ['-']
+
+### Build Java App
+    - id: 'build_java'
+      name: 'gcr.io/cloud-marketplace-containers/google/bazel'
+      dir: 'Bazelbuild'
+      entrypoint: 'bazel'
+      args: ['build', '//:HelloWorld_deploy.jar', '--curses=no', '--spawn_strategy=local', '--remote_cache=${_BAZEL_CACHE_URL}', '--google_default_credentials', '--test_output=errors']
+      waitFor: ['-']
+ 
+### Go / Container Push
+    - id: 'container_push_go'
+      name: 'gcr.io/cloud-builders/docker'
+      dir: 'Gobuild'
+      args: ['push', '${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/numbers-image:latest']
+      waitFor: ["build_go"]
+
+## Java / Container Tag
+    - id: 'container_tag_java'
+      name: 'gcr.io/cloud-builders/docker'
+      dir: 'Bazelbuild'
+      args: ['build', '-t', 
+             '${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/java-image:latest', '.',
+             '--cache-from', '${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/numbers-image:latest']
+      waitFor: ["build_java"]
+### Java / Container Push
+    - id: 'container_push_java'
+      name: 'gcr.io/cloud-builders/docker'
+      dir: 'Bazelbuild'
+      args: ['push', '${_MYREGION}-docker.pkg.dev/${_PROJECT_ID}/quickstart-docker-repo/java-image:latest']
+      waitFor: ["container_tag_java"]
+
+substitutions:
+      _PROJECT_ID: "my-project"
+      _MYREGION: "europe-west6"
+      _BAZEL_CACHE_URL: "https://storage.googleapis.com/my-cacheeeeee"
+
+options:
+      machineType: 'E2_HIGHCPU_32'

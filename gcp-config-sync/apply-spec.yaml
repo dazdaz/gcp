@@ -1,0 +1,15 @@
+applySpecVersion: 1
+spec:
+  configSync:
+    # Set to true to install and enable Config Sync
+    enabled: true
+    # If you don't have a source of truth yet, omit the
+    # following fields. You can configure them later.
+    sourceType: git
+    sourceFormat: unstructured
+    syncRepo: ssh://<user>@<user>.<host>.com@source.developers.google.com:2022/p/<project>/r/<repo>
+    syncBranch: main
+    secretType: ssh
+    gcpServiceAccountEmail: monitoring@<project>.iam.gserviceaccount.com
+    metricsGcpServiceAccountEmail: monitoring@<playground>.iam.gserviceaccount.com
+    preventDrift: false

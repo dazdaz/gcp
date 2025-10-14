@@ -1,0 +1,60 @@
+# Setup Config Sync using Google Cloud Source Repo service
+
+### For monitoring
+gcloud iam service-accounts create monitoring \
+    --description="service account for monitoring" \
+    --display-name="monitoring"
+
+gcloud iam service-accounts add-iam-policy-binding \
+    monitoring@<project_name>.iam.gserviceaccount.com \
+    --member="serviceAccount:monitoring@<project_name>.iam.gserviceaccount.com" \
+    --role="roles/iam.serviceAccountUser"
+
+gcloud iam service-accounts add-iam-policy-binding \
+    --role roles/iam.workloadIdentityUser \
+    --member "serviceAccount:<project_name>.svc.id.goog[config-management-monitoring/default]" \
+    monitoring@<project_name>.iam.gserviceaccount.com
+
+kubectl create ns config-management-system
+# Add private key
+kubectl create secret generic git-creds --namespace=config-management-system --from-file=ssh=/Users/<myuser>/.ssh/configsync-repokey
+
+export PROJECT_ID=<projectname>
+export PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format=json | jq -r .projectNumber)
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+  --role roles/source.reader
+
+gcloud projects add-iam-policy-binding <project> --member serviceAccount:888888888888-compute@developer.gserviceaccount.com --role roles/source.reader
+
+# ~/.ssh/config
+Host source.developers.google.com
+    HostName source.developers.google.com
+    User <user>@<name>.<domain>.com
+    IdentityFile ~/.ssh/configsync-repokey
+
+ssh-keygen -t rsa -b 4096 -C "source repo build" -f ~/.ssh/configsync-repokey -P ''
+cat ~/.ssh/configsync-repokey.pub
+Upload key to https://source.cloud.google.com/user/ssh_keys
+
+# Test authentication
+ssh -i ~/.ssh/configsync-repokey source.developers.google.com -p 2022
+PTY allocation request failed on channel 0
+shell request failed on channel 0
+
+gcloud source repos create clusterspec-repo
+gcloud source repos list
+git clone ssh://<user>@<user>.<host>.com@source.developers.google.com:2022/p/<project>/r/<repo>
+
+gcloud beta container fleet config-management apply --membership=<clustername1> --config=apply-spec.yaml --project=<project>
+gcloud beta container fleet config-management status
+
+kubectl logs -l "component=config-management-operator" -n config-management-system
+kubectl logs -l "app=reconciler-manager" -n config-management-system
+# Useful for debugging Git issues or checking for successful execution
+kubectl logs -l "app=reconciler" -n config-management-system --since=60m --all-containers
+
+
+# https://cloud.google.com/anthos-config-management/docs/how-to/installing-config-sync
+# https://github.com/GoogleCloudPlatform/anthos-config-management-samples/tree/main
